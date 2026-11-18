@@ -1,0 +1,207 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spark Academy — Year 4</title><style>
+:root{--ink:#23324a;--pink:#dc5791;--purple:#7358b4;--blue:#397bb5;--bg:#f8f7fc;--line:#e8e2f1}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:var(--ink);font-size:17px;line-height:1.55}.wrap{max-width:840px;margin:auto;padding:20px}.head{background:#fff;border-bottom:3px solid #e9b2d3;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}.brand{font-weight:900;color:var(--purple);font-size:23px}.sub{color:#777;font-size:13px}.panel{background:white;border:1px solid var(--line);border-radius:18px;padding:25px;margin:20px 0;box-shadow:0 5px 24px #29233c0b}h1{font-size:29px;margin:8px 0;color:var(--purple)}h2{font-size:22px;color:var(--purple)}.pill{font-size:12px;color:#786f89;background:#f3effa;padding:5px 10px;border-radius:20px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center}.muted{color:#777;font-size:14px}.qtext{font-weight:700;margin:15px 0}.prompt{padding:14px 16px;background:#f9f7fd;border-left:4px solid #dca2c5;border-radius:7px;margin:12px 0}input[type=text]{width:100%;font-size:18px;padding:13px;border:2px solid #d8d1e7;border-radius:9px;margin:8px 0}input:focus,select:focus{outline:2px solid #b9a4df}.choice{display:block;padding:12px;border:1px solid #e0dbe9;border-radius:9px;margin:9px 0;cursor:pointer}.choice input{margin-right:10px}.action{border:0;background:var(--purple);color:white;font-weight:bold;padding:13px 22px;border-radius:10px;cursor:pointer;font-size:16px}.action.secondary{background:#f0ebf8;color:#604d9d}.action:disabled{opacity:.4;cursor:not-allowed}.small{padding:6px 11px;font-size:15px}.item{display:flex;align-items:center;justify-content:space-between;border:1px solid #e4ddea;border-radius:9px;padding:10px;margin:8px 0;background:white}.progress{height:9px;background:#eee;border-radius:20px;overflow:hidden}.progress>div{height:100%;background:var(--pink);transition:width .2s}.hidden{display:none}.footer{text-align:center;color:#777;font-size:13px;margin:35px 0}.error{color:#a42e50}.good{color:#287d5d}.review{border-bottom:1px solid #eee;padding:9px 0}select{font-size:16px;padding:9px;max-width:100%;border:1px solid #d6d0e4;border-radius:8px}button{touch-action:manipulation}@media(max-width:600px){.wrap{padding:10px}.panel{padding:17px}.row{flex-wrap:wrap}h1{font-size:24px}}
+
+.notice{padding:12px;border-radius:10px;background:#f7f2fd;color:#594683;margin:14px 0}.status{margin-top:10px;font-size:15px}.action:focus-visible{outline:3px solid #dca2c5}.success{color:#257854;font-weight:700}
+</style></head><body>
+<header class="head"><div><div class="brand">✦ SPARK ACADEMY</div><div class="sub">Year 4 • Term 1 • English Assessment</div></div><div class="sub">Designed by MD</div></header>
+<main class="wrap">
+<section id="intro" class="panel"><h1>Smart English Challenge</h1><p>20 questions • 2 parts • 20 marks</p><p>One submission per SPK ID on this browser. Read carefully. You can review answers before finishing.</p><label>Student full name<input type="text" id="student" autocomplete="name" placeholder="Full name" maxlength="120"></label><label>SPK ID<input type="text" id="spkid" placeholder="SPK ID" maxlength="30" autocomplete="off"></label><p class="muted">Keep this page open while you finish. Your progress is saved on this device.</p><button class="action" id="startBtn" type="button">Start assessment</button><p id="introErr" class="error" role="alert"></p></section>
+<section id="quiz" class="hidden"><div class="panel"><div class="row"><strong id="parttitle"></strong><span id="counter" class="pill"></span></div><div class="progress" style="margin-top:14px"><div id="bar" style="width:0"></div></div></div><div id="question" class="panel"></div><div class="row"><button class="action secondary" type="button" id="prev">← Previous</button><button class="action" type="button" id="next">Next →</button></div><p id="quizError" class="error" role="alert"></p></section>
+<section id="confirm" class="panel hidden"><h1>Ready to finish?</h1><p id="reviewCount"></p><p class="notice">Check your answers before submitting. An internet connection is required to send your report.</p><div class="row"><button type="button" class="action secondary" id="backReview">Review answers</button><button type="button" class="action" id="finishBtn">Submit assessment</button></div><p id="submitStatus" class="status" role="status"></p></section>
+<section id="finish" class="panel hidden"><h1>Assessment complete</h1><p class="success">Your submission was confirmed. Review your answers and marks below.</p><p id="receipt"></p><p id="score"></p><p id="partScores"></p><div id="studentReport"></div><p class="muted">This result is saved in this browser. You can download a copy to share with your teacher.</p><button class="action secondary" type="button" id="downloadReport">Download my report</button></section>
+<div class="footer">Spark Academy • Year 4 • Designed by MD</div></main>
+<script>
+'use strict';
+let Q=[],ix=0,answers=[],started=0,token='',student='',spkid='',busy=false;
+const RESULTS_URL='https://script.google.com/macros/s/AKfycbyXrgEsgWeV5D36TInsPOYYx1MNXB0rKGmcfAEKc_8Ez013Wl2vU_3uUI45fhcd06Zv/exec';
+const DRAFT='spark_y4_email_draft_v1';
+const $=id=>document.getElementById(id);
+const esc=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const show=id=>['intro','quiz','confirm','finish'].forEach(v=>$(v).classList.toggle('hidden',v!==id));
+function save(){try{localStorage.setItem(DRAFT,JSON.stringify({answers,student,spkid,token,started,ix}))}catch(e){}}
+function restore(){try{const d=JSON.parse(localStorage.getItem(DRAFT)||'null');if(!d)return;answers=d.answers||[];student=d.student||'';spkid=d.spkid||'';token=d.token||'';started=d.started||0;ix=Math.max(0,Math.min(19,d.ix||0));$('student').value=student;$('spkid').value=spkid;}catch(e){}}
+function fail(err,id){$(id).textContent=err&&err.message?err.message:String(err)}
+const Y4_QUESTIONS = [["type","Past simple","Accessible","Write the past simple form of <b>find</b>.","Yesterday, the explorers ___ an ancient map.",["found"]],["mcq","Possessive apostrophe","Accessible","One teacher owns the notebook. Choose the correct sentence.","",["The teachers notebook was missing.","The teacher’s notebook was missing.","The teachers’ notebook was missing."],1],["type","Commas in lists","Accessible","Write the <b>missing punctuation mark</b> between bread and cheese.","We packed bread [ ___ ] cheese and apples.",[","]],["order","Chronological order","Medium","Arrange the events from earliest to latest. Times: 8:00 left home; 9:30 reached museum; 12:00 ate lunch; 3:00 returned home.","",["Returned home","Ate lunch","Left home","Reached the museum"],["Left home","Reached the museum","Ate lunch","Returned home"]],["type","Connectives: result","Medium","Write <b>one connective</b> to show a result. Word bank: because • so • although.","The road was flooded, ___ the travellers took another route.",["so"]],["mcq","Future: general prediction","Medium","Choose the correct form for a general prediction.","I think people ___ travel in flying taxis one day.",["will","were","did"],0],["type","Future with will: negative prediction","Medium","Complete the prediction using <b>will not</b> and the verb in brackets. Both <b>will not replace</b> and <b>won’t replace</b> are accepted.","I think robots ___ (replace) every teacher in the future.",["will not replace","won’t replace","won't replace"]],["rewrite","Contrast clause","Medium","Join the sentences with <b>Although</b> at the beginning. Keep the original words in the same order.","The girl was frightened. She entered the dark room.",["Although the girl was frightened, she entered the dark room."]],["rewrite","Connective proofreading","Tricky 1","Rewrite the sentence correctly. Remove the unnecessary connective.","Although the path was narrow, but the explorers continued.",["Although the path was narrow, the explorers continued."]],["double","Fronted adverbial and irregular plural","Tricky 2","Correct exactly <b>two highlighted errors</b>. First enter the missing punctuation after “By lunchtime”; then correct the plural “childs”.","By lunchtime [ ___ ] the three <u>childs</u> had reached the castle.",[[","],["children"]]],["match","Reporting verb meanings","Accessible","Match each reporting verb to its meaning.","",["whispered","cheered","asked"],["Requested information","Expressed happiness loudly","Spoke very quietly"],["Spoke very quietly","Expressed happiness loudly","Requested information"]],["type","Complaining","Accessible","Complete the sentence with a suitable reporting verb from your lessons. Write one word.","“Why must I tidy the whole room again?” Jack ___ unhappily.",["grumbled","complained"]],["mcq","Announcing","Accessible","Which reporting verb means giving information publicly to an audience?","",["muttered","announced","begged"],1],["type","Explaining","Medium","Write the reporting verb that describes making something clear to another person. Write one word.","“First, press this button. Then wait for the light,” Dad ___ while showing how the machine worked.",["explained"]],["type","Direct speech: comma","Medium","Replace the <b>underlined full stop</b> with the correct mark. Write the mark only.","“I found the letter<u>.</u>” said Emma.",[","]],["match","Reporting verb purposes","Medium","Match each reporting verb to its purpose.","",["begged","snapped","wondered"],["Thought with curiosity","Asked desperately","Spoke sharply in anger"],["Asked desperately","Spoke sharply in anger","Thought with curiosity"]],["type","Responding","Medium","Complete with the reporting verb that shows Mia is answering Tom. Write one word.","“The key is under the table,” Mia ___ when Tom asked where it was.",["replied","answered"]],["order","Interrupted direct speech","Medium","Arrange the three chunks to make a correctly punctuated sentence.","",["“if you need me.”","said Mia,","“I will help,”"],["“I will help,”","said Mia,","“if you need me.”"]],["rewrite","Direct speech: complete punctuation","Tricky 1","Rewrite the entire sentence using correct capital letters, punctuation and <b>double speech marks</b>.","where are you going asked the frightened boy",["“Where are you going?” asked the frightened boy.","\"Where are you going?\" asked the frightened boy."]],["double","Reporting verb and exclamation","Tricky 2","A frightened child is trapped and calls urgently for help. Write the punctuation for a strong cry and the past-tense reporting verb meaning asked desperately.","“Please help me [ ___ ]” the trapped child ___.",[["!"],["begged"]]]];
+function y4Norm_(x){return String(x==null?'':x).trim().toLowerCase().replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/\s+/g,' ');}
+function y4Grade_(q,a){
+  const t=q[0];
+  if(t==='mcq')return a===q[6]?1:0;
+  if(t==='type')return q[5].some(v=>y4Norm_(a)===y4Norm_(v))?1:0;
+  if(t==='rewrite' && q[1]==='Direct speech: complete punctuation') {
+    const normalizeQuotes = value => String(value == null ? '' : value).trim().replace(/[“”]/g, '"').replace(/\s+/g, ' ');
+    return q[5].some(expected => normalizeQuotes(a) === normalizeQuotes(expected)) ? 1 : 0;
+  }
+  if(t==='rewrite')return q[5].some(v=>y4Norm_(a).replace(/\s+([,.!?])/g,'$1')===y4Norm_(v))?1:0;
+  if(t==='order')return Array.isArray(a)&&JSON.stringify(a)===JSON.stringify(q[6])?1:0;
+  if(t==='match')return q[7].reduce((s,v,i)=>s+(Array.isArray(a)&&a[i]===v?1/3:0),0);
+  if(t==='double')return q[5].reduce((s,opts,i)=>s+(Array.isArray(a)&&opts.some(v=>y4Norm_(a[i])===y4Norm_(v))?.5:0),0);
+  return 0;
+}
+
+function getStudentQuestions(){
+  return Y4_QUESTIONS.map(q=>{
+    const t=q[0];
+    return {type:t,skill:q[1],difficulty:q[2],instruction:q[3],stem:q[4],
+      choices:t==='mcq'?q[5]:t==='order'?q[5]:t==='match'?{words:q[5],options:q[6]}:null};
+  });
+}
+
+const attemptKey = id => 'spark_y4_email_result_v1_' + id;
+function beginAssessment(name,id,prior){
+ const previous=JSON.parse(localStorage.getItem(attemptKey(id))||'null');
+ if(previous?.teacherReportConfirmed){
+  if(previous.student===name)return {ok:true,completed:previous};
+  return {ok:false,reason:'This SPK ID has already been used on this browser.'};
+ }
+ const token=prior||makeToken();
+ localStorage.setItem(attemptKey(id)+'_check','1');
+ localStorage.removeItem(attemptKey(id)+'_check');
+ return {ok:true,token,resumed:!!prior};
+}
+function makeToken(){
+ return Array.from(crypto.getRandomValues(new Uint8Array(8)),n=>n.toString(16).padStart(2,'0')).join('');
+}
+async function submitAssessment(name,id,session,payload,elapsed){
+ const key=attemptKey(id);
+ const previous=JSON.parse(localStorage.getItem(key)||'null');
+ if(previous?.teacherReportConfirmed){
+  if(previous.student===name)return previous;
+  throw Error('This SPK ID has already been used on this browser.');
+ }
+ const questions=Y4_QUESTIONS.map((q,i)=>({number:i+1,skill:q[1],response:payload[i],mark:y4Grade_(q,payload[i])}));
+ const sum=items=>Math.round(items.reduce((total,q)=>total+q.mark,0)*100)/100;
+ const result={ok:true,student:name,id,elapsed,receipt:'Y4-'+session.slice(0,8).toUpperCase(),score:sum(questions),
+  report:{grammar:sum(questions.slice(0,10)),speech:sum(questions.slice(10)),questions}};
+ const response=await fetch(RESULTS_URL,{
+  method:'POST',
+  credentials:'omit',
+  headers:{'Content-Type':'text/plain;charset=UTF-8'},
+  body:JSON.stringify({
+   student:name, spk_id:id, assessment:'Spark Academy — Year 4 English Assessment',
+   score:result.score, total_marks:Y4_QUESTIONS.length, elapsed_seconds:elapsed,
+   parts:{grammar:result.report.grammar,synonyms_and_direct_speech:result.report.speech},
+   questions:questions.map((q,i)=>{
+    const item=Y4_QUESTIONS[i];
+    const answer=item[0]==='mcq'&&typeof q.response==='number'?item[5][q.response]:q.response;
+    return {question:q.number,skill:q.skill,difficulty:item[2],part:i<10?'Grammar':'Synonyms & Direct Speech',
+     response:answer,mark:Number(q.mark.toFixed(2))};
+   })
+  })
+ });
+ if(!response.ok)throw Error('The results service is temporarily unavailable.');
+ const confirmation=await response.json();
+ if(!(confirmation.ok||confirmation.success)||!confirmation.receipt){
+  throw Error('The results service did not return a receipt.');
+ }
+ result.receipt=confirmation.receipt;
+ result.teacherReportConfirmed=true;
+ try{localStorage.setItem(key,JSON.stringify(result))}catch(e){}
+ return result;
+}
+const assessmentActions={beginAssessment,getStudentQuestions,submitAssessment};
+function runAssessmentAction(fn,args,ok,bad){
+ Promise.resolve().then(()=>assessmentActions[fn](...args)).then(ok).catch(bad);
+}
+function start(){
+ if(busy)return;
+ const name=$('student').value.trim(),id=$('spkid').value.trim().toUpperCase();
+ $('introErr').textContent='';
+ if(name.length<5||!/^SPK[A-Z0-9_-]{1,26}$/i.test(id)){$('introErr').textContent='Enter your full name and a valid SPK ID.';return;}
+ busy=true;$('startBtn').disabled=true;
+ const prior=(name===student&&id===spkid)?token:'';
+ runAssessmentAction('beginAssessment',[name,id,prior],res=>{
+  if(!res.ok){$('introErr').textContent=res.reason;busy=false;$('startBtn').disabled=false;return;}
+  if(res.completed){Q=getStudentQuestions();busy=false;$('startBtn').disabled=false;showResult(res.completed);return;}
+  student=name;spkid=id;token=res.token;if(!started||!res.resumed){started=Date.now();answers=[];ix=0;}
+  save();runAssessmentAction('getStudentQuestions',[],qs=>{Q=qs;busy=false;$('startBtn').disabled=false;show('quiz');render();},err=>{busy=false;$('startBtn').disabled=false;fail(err,'introErr')});
+ },err=>{busy=false;$('startBtn').disabled=false;fail(err,'introErr')});
+}
+function setAns(v){answers[ix]=v;save();updateProgress()}
+function updateProgress(){let count=Q.filter((q,i)=>{const a=answers[i];return Array.isArray(a)?a.every(x=>String(x).trim()!==''):a!==undefined&&a!==null&&String(a).trim()!==''}).length;$('bar').style.width=(count/Q.length*100)+'%';$('counter').textContent='Question '+(ix+1)+' / '+Q.length+' • '+count+' answered'}
+function render(){
+ const q=Q[ix],t=q.type;
+ if(t==='order'&&!Array.isArray(answers[ix])){answers[ix]=[...q.choices];save()}
+ $('parttitle').textContent=ix<10?'Part 1 — Grammar':'Part 2 — Synonyms for Said & Direct Speech';
+ let out='<div class="row"><b>Question '+(ix+1)+'</b><span class="pill">'+esc(q.difficulty)+'</span></div><div class="qtext">'+q.instruction+'</div>'+(q.stem?'<div class="prompt">'+q.stem+'</div>':'');
+ if(t==='type'||t==='rewrite')out+='<input type="text" id="entry" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Your answer" placeholder="Type your answer" value="'+esc(answers[ix]||'')+'">';
+ if(t==='mcq')out+=q.choices.map((o,j)=>'<label class="choice"><input type="radio" name="answer" value="'+j+'" '+(answers[ix]===j?'checked':'')+'> '+esc(o)+'</label>').join('');
+ if(t==='double'){const a=answers[ix]||['',''];out+='<label>Answer A<input type="text" id="a0" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" value="'+esc(a[0])+'" placeholder="First correction"></label><label>Answer B<input type="text" id="a1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" value="'+esc(a[1])+'" placeholder="Second correction"></label>'}
+ if(t==='match'){const a=answers[ix]||['','',''];out+=q.choices.words.map((w,j)=>'<div class="item"><b>'+esc(w)+'</b><select data-m="'+j+'"><option value="">Choose meaning</option>'+q.choices.options.map(v=>'<option value="'+esc(v)+'" '+(a[j]===v?'selected':'')+'>'+esc(v)+'</option>').join('')+'</select></div>').join('')}
+ if(t==='order'){const a=answers[ix]||q.choices;out+='<p class="muted">Use the arrows to arrange the items.</p>'+a.map((v,j)=>'<div class="item"><span>'+esc(v)+'</span><span><button type="button" class="action secondary small" data-move="'+j+'" data-dir="-1" '+(j===0?'disabled':'')+'>↑</button> <button type="button" class="action secondary small" data-move="'+j+'" data-dir="1" '+(j===a.length-1?'disabled':'')+'>↓</button></span></div>').join('')}
+ $('question').innerHTML=out;$('prev').disabled=ix===0;$('next').textContent=ix===19?'Review & finish ✓':'Next →';
+ if(t==='type'||t==='rewrite')$('entry').addEventListener('input',e=>setAns(e.target.value));
+ if(t==='mcq')document.querySelectorAll('input[name=answer]').forEach(e=>e.addEventListener('change',ev=>setAns(Number(ev.target.value))));
+ if(t==='double')for(let j=0;j<2;j++)$('a'+j).addEventListener('input',e=>{let a=answers[ix]||['',''];a[j]=e.target.value;setAns([...a])});
+ if(t==='match')document.querySelectorAll('[data-m]').forEach(e=>e.addEventListener('change',ev=>{let a=answers[ix]||['','',''];a[Number(e.dataset.m)]=ev.target.value;setAns([...a])}));
+ if(t==='order')document.querySelectorAll('[data-move]').forEach(e=>e.addEventListener('click',()=>{let a=[...(answers[ix]||q.choices)],j=Number(e.dataset.move),k=j+Number(e.dataset.dir);[a[j],a[k]]=[a[k],a[j]];setAns(a);render()}));
+ updateProgress();
+}
+function go(d){if(busy)return;if(ix===19&&d===1){review();return;}ix=Math.max(0,Math.min(19,ix+d));save();render();window.scrollTo(0,0)}
+function review(){const count=Q.filter((q,i)=>{const a=answers[i];return Array.isArray(a)?a.some(x=>String(x).trim()===''):a==null||String(a).trim()===''}).length;$('reviewCount').textContent=count?count+' question(s) are unanswered or incomplete. You may review them before submitting.':'You have reached the end of the assessment.';show('confirm');window.scrollTo(0,0)}
+function renderReport(report){
+ if(!report)return;
+ $('partScores').textContent='Grammar: '+report.grammar+' / 10 • Synonyms & Direct Speech: '+report.speech+' / 10';
+ const details=document.createElement('details');
+ details.open=true;
+ const title=document.createElement('summary');
+ title.textContent='Your answers and marks';
+ details.append(title);
+ const list=document.createElement('ol');
+ report.questions.forEach(q=>{
+  const question=Q[q.number-1];
+  const response=question&&question.type==='mcq'&&typeof q.response==='number'?question.choices[q.response]:q.response;
+  const item=document.createElement('li');
+  item.className='review';
+  const heading=document.createElement('strong');
+  heading.textContent=q.skill+' — '+Number(q.mark.toFixed(2))+' / 1';
+  const answer=document.createElement('div');
+  const display=Array.isArray(response)?response.map(value=>value||'Unanswered').join(' • '):response;
+  answer.textContent='Your answer: '+(display==null||display===''?'Unanswered':display);
+  item.append(heading,answer);
+  list.append(item);
+ });
+ details.append(list);
+ $('studentReport').replaceChildren(details);
+}
+function showResult(result){
+ $('receipt').textContent='Receipt: '+result.receipt;
+ $('score').textContent='Score: '+result.score+' / 20';
+ renderReport(result.report);
+ $('downloadReport').onclick=()=>downloadResult(result);
+ show('finish');
+ window.scrollTo(0,0);
+}
+function downloadResult(result){
+ const lines=['Spark Academy — Year 4 English Assessment','Student: '+result.student,'SPK ID: '+result.id,
+  'Receipt: '+result.receipt,'Score: '+result.score+' / 20','Grammar: '+result.report.grammar+' / 10',
+  'Synonyms & Direct Speech: '+result.report.speech+' / 10',''];
+ for(const q of result.report.questions){
+  const question=Q[q.number-1];
+  const response=question.type==='mcq'&&typeof q.response==='number'?question.choices[q.response]:q.response;
+  const answer=Array.isArray(response)?response.map(v=>v||'Unanswered').join(' • '):response;
+  lines.push('Q'+q.number+' — '+q.skill+' — '+Number(q.mark.toFixed(2))+' / 1',
+   'Your answer: '+(answer==null||answer===''?'Unanswered':answer),'');
+ }
+ const url=URL.createObjectURL(new Blob([lines.join(String.fromCharCode(10))],{type:'text/plain;charset=utf-8'}));
+ const link=document.createElement('a');
+ link.href=url;
+ link.download=result.receipt+'-report.txt';
+ document.body.append(link);
+ link.click();
+ link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function submit(){if(busy)return;busy=true;$('finishBtn').disabled=true;$('backReview').disabled=true;$('submitStatus').textContent='Sending your answers to your teacher…';
+ const payload=Array.from({length:20},(_,i)=>answers[i]===undefined?null:answers[i]);
+ runAssessmentAction('submitAssessment',[student,spkid,token,payload,Math.round((Date.now()-started)/1000)],res=>{
+  busy=false;
+  if(!res.ok){$('finishBtn').disabled=false;$('backReview').disabled=false;$('submitStatus').textContent='Submission not confirmed. Please retry.';return;}
+  try{localStorage.removeItem(DRAFT)}catch(e){}
+  showResult(res);
+ },err=>{busy=false;$('finishBtn').disabled=false;$('backReview').disabled=false;$('submitStatus').textContent='Could not confirm delivery. Your answers are still here. Check your connection before retrying. '+(err.message||String(err));});
+}
+$('startBtn').addEventListener('click',start);
+$('prev').addEventListener('click',()=>go(-1));$('next').addEventListener('click',()=>go(1));
+$('backReview').addEventListener('click',()=>{show('quiz');render()});$('finishBtn').addEventListener('click',submit);
+restore();
+</script></body></html>
